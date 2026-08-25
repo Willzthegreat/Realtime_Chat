@@ -23,8 +23,8 @@ export default function Home() {
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
-            <Button asChild>
-              <Link href="rooms/new">Create a Chat Room</Link>
+            <Button render={<Link href="/rooms/new" />}>
+              Create a Chat Room
             </Button>
           </EmptyContent>
         </Empty>
