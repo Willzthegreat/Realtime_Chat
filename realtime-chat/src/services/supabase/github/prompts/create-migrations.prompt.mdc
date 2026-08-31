@@ -1,0 +1,14 @@
+---
+description: Guidelines for writing Postgres migrations
+alwaysApply: false
+---
+# Database: Create migration
+
+This project uses migrations provided by the Supabase CLI. Create files in `supabase/migrations/` using `YYYYMMDDHHmmss_short_description.sql` in UTC.
+
+- Use valid PostgreSQL SQL and lowercase SQL keywords.
+- Begin with a header describing the purpose, affected objects, and special considerations.
+- Add comments explaining each migration step and all destructive operations.
+- Enable RLS on every newly created table, including public tables.
+- Create granular RLS policies for each required operation and role.
+- Preserve existing data and never silently hide failed schema assumptions.

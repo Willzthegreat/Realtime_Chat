@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 
 import { createClient } from '@/lib/client'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/src/components/ui/button'
 
 export function LogoutButton() {
   const router = useRouter()
@@ -14,5 +14,9 @@ export function LogoutButton() {
     router.push('/auth/login')
   }
 
-  return <Button onClick={logout}>Logout</Button>
+  return <Button 
+  className="cursor-pointer"
+  variant={"outline"} 
+  size={"sm"}
+  onClick={logout}>Logout</Button>
 }

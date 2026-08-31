@@ -1,0 +1,15 @@
+---
+description: Guidelines for writing Postgres SQL
+alwaysApply: false
+---
+# Postgres SQL Style Guide
+
+- Use lowercase SQL reserved words and `snake_case` identifiers.
+- Keep names unique and within PostgreSQL's 63-character limit.
+- Use the `public` schema unless another schema is required and always qualify schema names.
+- Prefer plural table names and singular column names.
+- Add an identity-generated `id` primary key unless the schema requires another key.
+- Add explicit nullability, foreign keys, check constraints, and deliberate delete behavior.
+- Add a table comment describing each table's purpose.
+- Use readable whitespace, indentation, meaningful aliases, and explicit column lists in production queries.
+- Use ISO 8601 timestamps and comments for complex logic.

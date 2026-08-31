@@ -1,0 +1,15 @@
+---
+description: Coding rules for Supabase Realtime
+alwaysApply: false
+---
+# Supabase Realtime AI Assistant Guide
+
+- Prefer `broadcast` for new realtime events and database-triggered changes.
+- Use `presence` sparingly for online state and counters.
+- Prefer private channels and set `private: true` when using authentication or RLS.
+- Name topics by scope, entity, and optional ID, such as `room:123:messages`.
+- Use snake_case event names such as `message_created`; avoid generic names like `update`.
+- Include error handling, reconnection behavior, and unsubscribe cleanup in every client implementation.
+- Index columns used by Realtime authorization policies.
+- Do not subscribe during render or create duplicate subscriptions.
+- Do not use `realtime.send` or `realtime.broadcast_changes` from client code; use them in database functions or triggers.

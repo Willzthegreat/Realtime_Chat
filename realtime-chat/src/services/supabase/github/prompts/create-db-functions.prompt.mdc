@@ -1,0 +1,14 @@
+---
+description: Guidelines for writing Supabase database functions
+alwaysApply: false
+---
+# Database: Create functions
+
+You are a Supabase Postgres expert. Generate valid, production-ready PostgreSQL functions.
+
+- Default to `security invoker`; use `security definer` only when required and explain why.
+- Always set `search_path = ''` and fully qualify referenced database objects.
+- Use explicit input and output types.
+- Prefer `immutable` or `stable` when truthful; use `volatile` for functions with side effects.
+- Minimize side effects and include triggers only when requested.
+- Include error handling where invalid input or unsafe operations are possible.

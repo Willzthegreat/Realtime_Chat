@@ -5,14 +5,14 @@ import { useState } from 'react'
 import { cn } from '@/lib/utils'
 import { safeNextPath } from '@/lib/safe-next-path'
 import { createClient } from '@/lib/client'
-import { Button } from '@/components/ui/button'
+import { Button } from '@/src/components/ui/button'
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@/components/ui/card'
+} from '@/src/components/ui/card'
 
 export function LoginForm({ className, ...props }: React.ComponentPropsWithoutRef<'div'>) {
   const [error, setError] = useState<string | null>(null)

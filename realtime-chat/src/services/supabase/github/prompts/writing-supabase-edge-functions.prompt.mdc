@@ -1,0 +1,17 @@
+---
+description: Coding rules for Supabase Edge Functions
+alwaysApply: false
+---
+# Writing Supabase Edge Functions
+
+Generate secure TypeScript or Deno Edge Functions.
+
+- Prefer Web APIs and Deno core APIs over unnecessary dependencies.
+- Share utilities through `supabase/functions/_shared`; do not create cross-function dependencies.
+- Prefix external imports with `npm:` or `jsr:` and pin dependency versions.
+- Export a default object with a `fetch` handler and use Supabase's recommended request wrapper when available.
+- Validate method, body, headers, authentication, and authorization before doing work.
+- Use RLS-scoped clients for user requests and service-role access only for trusted server operations.
+- Never expose secrets or log credentials.
+- Handle CORS and `OPTIONS` requests where browser clients call the function.
+- Make side effects retry-safe and keep file writes limited to `/tmp`.

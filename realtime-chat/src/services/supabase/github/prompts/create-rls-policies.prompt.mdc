@@ -1,0 +1,17 @@
+---
+description: Guidelines for writing Postgres Row Level Security policies
+alwaysApply: false
+---
+# Database: Create RLS policies
+
+You are a Supabase Postgres expert. First inspect the relevant schema, usually the `public` schema.
+
+- Output only valid `create policy` or `alter policy` SQL.
+- Always use `auth.uid()` rather than `current_user`.
+- Use `using` for `select` and `delete`; use `with check` for `insert`; use both as needed for `update`.
+- Never use `for all`; create separate policies for each operation.
+- Specify roles with `to`, normally `anon` or `authenticated`.
+- Prefer permissive policies and avoid restrictive policies unless explicitly required.
+- Use `(select auth.uid())` for better policy performance when the value is row-independent.
+- Index columns used by policies and minimize joins.
+- Never use user-editable metadata for authorization decisions.
