@@ -20,6 +20,21 @@ export async function createRoom(unsafeData: z.infer<typeof createRoomSchema>) {
 
     const supabase = createAdminClient()
 
+    // Room names are compared case-insensitively. These separators are also
+    // ignored so names such as "My_Room", "my-room", and "my+room" collide.
+    const normalizedName = normalizeRoomName(data.name)
+    const { data: existingRooms, error: existingRoomsError } = await supabase
+        .from("chat_room")
+        .select("name")
+
+    if (existingRoomsError) {
+        return { error: true, message: "Failed to check existing rooms" }
+    }
+
+    if (existingRooms.some((room) => normalizeRoomName(room.name) === normalizedName)) {
+        return { error: true, message: "A room with that name already exists" }
+    }
+
     const { data: room, error: roomError } = await supabase
     .from("chat_room")
     .insert({ name: data.name, is_public: data.isPublic})
@@ -41,4 +56,8 @@ export async function createRoom(unsafeData: z.infer<typeof createRoomSchema>) {
   }
 
   redirect(`/rooms/${room.id}`)
+}
+
+function normalizeRoomName(name: string) {
+    return name.trim().toLocaleLowerCase().replace(/[+_-]/g, "")
 }

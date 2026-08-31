@@ -26,6 +26,13 @@ import {
 import { LeaveRoomButton } from "../components/leaveRoomButton";
 import { JoinRoomButton } from "../components/join-room-button";
 
+type Room = {
+  id: string;
+  name: string;
+  memberCount: number;
+  isJoined: boolean;
+};
+
 export default async function Home() {
   const user = await getCurrentUser();
 
@@ -33,12 +40,12 @@ export default async function Home() {
     redirect("/auth/login");
   }
 
-  const [publicRooms, joinedRooms] = await Promise.all([
-    getPublicRooms(),
-    getJoinedRooms(user.id),
-  ]);
+  const { publicRooms, joinedRooms } = await getRoomsForUser(user.id);
 
-  if (publicRooms.length === 0 && joinedRooms.length === 0) {
+  const uniqueJoinedRooms = deduplicateRooms(joinedRooms);
+  const uniquePublicRooms = deduplicateRooms(publicRooms);
+
+  if (uniquePublicRooms.length === 0 && uniqueJoinedRooms.length === 0) {
     return (
       <>
         <div className="container mx-auto max-w-3xl px-4 py-8 space-y-8">
@@ -69,28 +76,44 @@ export default async function Home() {
   return (
     <>
       <div className="container mx-auto px-4 py-8 space-y-8">
-        <RoomList title="Your Rooms" rooms={joinedRooms} isJoined />
+        <RoomList title="Your Rooms" rooms={uniqueJoinedRooms} />
 
         <RoomList
           title="Public Rooms"
-          rooms={publicRooms.filter(
-            (room) => !joinedRooms.some((r) => r.id === room.id)
-          )}
-          isJoined={false}
+          rooms={uniquePublicRooms}
         />
       </div>
     </>
   );
 }
 
+function normalizeRoomName(name: string) {
+  return name.trim().toLowerCase().replace(/[+_-]/g, "");
+}
+
+function deduplicateRooms(
+  rooms: Room[]
+) {
+  const seenNames = new Set<string>();
+
+  return rooms.filter((room) => {
+    const normalizedName = normalizeRoomName(room.name);
+
+    if (seenNames.has(normalizedName)) {
+      return false;
+    }
+
+    seenNames.add(normalizedName);
+    return true;
+  });
+}
+
 function RoomList({
   title,
   rooms,
-  isJoined = false,
 }: {
   title: string;
-  rooms: { id: string; name: string; memberCount: number }[];
-  isJoined: boolean;
+  rooms: Room[];
 }) {
   if (rooms.length === 0) return null;
 
@@ -107,7 +130,7 @@ function RoomList({
 
         <div className="grid gap-4 grid-cols-[repeat(auto-fill,minmax(250px,1fr))]">
           {rooms.map((room) => (
-            <RoomCard {...room} key={room.id} isJoined={isJoined} />
+            <RoomCard {...room} key={room.id} />
           ))}
         </div>
       </div>
@@ -142,7 +165,7 @@ function RoomCard({
             <>
               <Button
                 render={<Link href={`/rooms/${id}`} />}
-                className="grow"
+                className="grow "
                 size="sm"
               >
                 Enter
@@ -152,10 +175,15 @@ function RoomCard({
                 roomId={id}
                 size="sm"
                 variant="destructive"
-              />
+                className="cursor-pointer "
+              > 
+              Leave
+              </LeaveRoomButton> 
             </>
           ) : (
-            <JoinRoomButton roomId={id} variant="outline" className="grow" size="sm" />
+            <JoinRoomButton roomId={id} variant="outline" className="grow cursor-pointer" size="sm">
+              Join
+            </JoinRoomButton>
           )}
         </CardFooter>
       </Card>
@@ -163,47 +191,46 @@ function RoomCard({
   );
 }
 
-async function getPublicRooms() {
+async function getRoomsForUser(userId: string) {
   const supabase = createAdminClient();
 
-  const { data, error } = await supabase
-    .from("chat_room")
-    .select("id, name, chat_room_members(count)")
-    .eq("is_public", true)
-    .order("name", { ascending: true });
+  const [{ data: rooms, error: roomsError }, { data: memberships, error: membershipsError }] =
+    await Promise.all([
+      supabase
+        .from("chat_room")
+        .select("id, name, is_public")
+        .order("name", { ascending: true }),
+      supabase
+        .from("chat_room_members")
+        .select("chat_room_id, member_id"),
+    ]);
 
-  if (error) {
-    return [];
+  if (roomsError || membershipsError || rooms == null || memberships == null) {
+    return { publicRooms: [], joinedRooms: [] };
   }
 
-  return data.map((room) => ({
+  const joinedRoomIds = new Set(
+    memberships
+      .filter((membership) => membership.member_id === userId)
+      .map((membership) => membership.chat_room_id)
+  );
+
+  const roomsWithCounts = rooms.map((room) => ({
     id: room.id,
     name: room.name,
-    memberCount: room.chat_room_members[0]?.count ?? 0,
+    memberCount: memberships.filter(
+      (membership) => membership.chat_room_id === room.id
+    ).length,
+    isPublic: room.is_public,
+    isJoined: joinedRoomIds.has(room.id),
   }));
-}
 
-async function getJoinedRooms(userId: string) {
-  const supabase = createAdminClient();
-
-  const { data, error } = await supabase
-    .from("chat_room")
-    .select("id, name, chat_room_members(member_id)")
-    .order("name", { ascending: true });
-
-  if (error) {
-    return [];
-  }
-
-  return data
-    .filter((room) =>
-      room.chat_room_members.some(
-        (u) => u.member_id === userId
-      )
-    )
-    .map((room) => ({
-      id: room.id,
-      name: room.name,
-      memberCount: room.chat_room_members.length,
-    }));
+  return {
+    joinedRooms: roomsWithCounts
+      .filter((room) => !room.isPublic && room.isJoined)
+      .map(({ isPublic: _isPublic, ...room }) => room),
+    publicRooms: roomsWithCounts
+      .filter((room) => room.isPublic)
+      .map(({ isPublic: _isPublic, ...room }) => room),
+  };
 }

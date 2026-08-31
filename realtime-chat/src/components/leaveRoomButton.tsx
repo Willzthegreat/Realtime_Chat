@@ -37,12 +37,14 @@ export function LeaveRoomButton({
         if (error) {
             return {
                 error: true, 
-                message: "Failed to join room"
+                message: "Failed to Leave room"
             }
         }
 
+
         router.refresh()
-        router.push(`/rooms/${roomId}`)
+        
+        return { error: false }
     }
  
     return (
