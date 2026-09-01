@@ -29,3 +29,15 @@ on public.chat_room
 for select
 to authenticated
 using (is_public = true);
+
+create policy "Room members can read messages"
+on public.message for select to authenticated
+using (exists (select 1 from public.chat_room_members
+  where chat_room_members.chat_room_id = message.chat_room_id
+    and chat_room_members.member_id = (select auth.uid())));
+
+create policy "Room members can send messages"
+on public.message for insert to authenticated
+with check (author_id = (select auth.uid()) and exists (select 1 from public.chat_room_members
+  where chat_room_members.chat_room_id = message.chat_room_id
+    and chat_room_members.member_id = (select auth.uid())));

@@ -1,14 +1,8 @@
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/src/components/ui/card";
 import { createAdminClient } from "@/src/services/supabase/server";
 import { getCurrentUser } from "@/src/services/supabase/lib/getCurrentUser";
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import { RoomClient } from "./client";
+import type { Message } from "@/src/services/supabase/actions/messages";
 
 type RoomPageProps = {
   params: Promise<{ id: string }>;
@@ -39,9 +33,10 @@ export default async function RoomPage({ params }: RoomPageProps) {
         .maybeSingle(),
       supabase
         .from("message")
-        .select("id, text, created_at, author_id")
+        .select("id, text, created_at, author_id, author:user_profile(name, image_url)")
         .eq("chat_room_id", id)
-        .order("created_at", { ascending: true }),
+        .order("created_at", { ascending: false })
+        .limit(120)
     ]);
 
   if (roomError || room == null) {
@@ -52,41 +47,13 @@ export default async function RoomPage({ params }: RoomPageProps) {
     redirect("/");
   }
 
-  return (
-    <main className="container mx-auto max-w-3xl px-4 py-8">
-      <Card>
-        <CardHeader>
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <CardTitle>{room.name}</CardTitle>
-              <CardDescription>
-                {room.is_public ? "Public room" : "Private room"}
-              </CardDescription>
-            </div>
-            <Link href="/" className="text-sm text-muted-foreground hover:underline">
-              Back to rooms
-            </Link>
-          </div>
-        </CardHeader>
+  const initialMessages: Message[] = (messages ?? []).map((message) => ({
+    id: message.id,
+    text: message.text,
+    created_at: message.created_at,
+    author_id: message.author_id,
+    author: Array.isArray(message.author) ? message.author[0] : message.author,
+  }));
 
-        <CardContent>
-          <div className="min-h-64 space-y-3 rounded-md border p-4">
-            {messages?.length ? (
-              messages.map((message) => (
-                <div key={message.id} className="rounded-md bg-muted px-3 py-2">
-                  <p>{message.text}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {message.author_id === user.id ? "You" : "Room member"} ·{" "}
-                    {new Date(message.created_at).toLocaleString()}
-                  </p>
-                </div>
-              ))
-            ) : (
-              <p className="text-sm text-muted-foreground">No messages yet.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-    </main>
-  );
+  return <RoomClient room={{ id: room.id, name: room.name }} user={{ id: user.id }} message={initialMessages} />;
 }
