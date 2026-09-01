@@ -44,6 +44,8 @@ export function JoinRoomButton({
 
         router.refresh()
         router.push(`/rooms/${roomId}`)
+
+        return { error: false }
     }
  
     return (
