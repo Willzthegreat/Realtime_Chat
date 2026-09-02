@@ -69,7 +69,7 @@ export function RoomClient({
     const supabase = createClient();
 
     const channel = supabase
-      .channel(`room-messages:${room.id}`)
+      .channel(`room:${room.id}:messages`, { config: { private: true } })
       .on(
         "postgres_changes",
         {
@@ -106,6 +106,37 @@ export function RoomClient({
           });
         },
       )
+      .on("broadcast", { event: "INSERT" }, (payload) => {
+        const record = payload.payload as {
+          id: string;
+          text: string;
+          created_at: string;
+          author_name: string;
+          author_image_url: string | null;
+        };
+
+        if (!record) return;
+
+        setMessages((current) => {
+          if (current.some((item) => item.id === record.id)) {
+            return current;
+          }
+
+          return [
+            ...current,
+            {
+              id: record.id,
+              text: record.text,
+              created_at: record.created_at,
+              author_id: user.id,
+              author: {
+                name: record.author_name,
+                image_url: record.author_image_url,
+              },
+            },
+          ];
+        });
+      })
       .subscribe();
 
     return () => {
