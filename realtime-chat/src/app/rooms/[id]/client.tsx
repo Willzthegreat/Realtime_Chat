@@ -1,130 +1,3 @@
-// "use client";
-
-// import { useEffect, useState } from "react";
-// import { ChatInput } from "@/src/components/chat-input";
-// import type { Message } from "@/src/services/supabase/actions/messages";
-// import { createClient } from "@/src/services/supabase/client";
-// import { UserIcon } from "lucide-react";
-
-// export function RoomClient({ room, user, message }: { user: { id: string }; room: { id: string; name: string }; message: Message[] }) {
-//   const [messages, setMessages] = useState(message);
-//   const [onlineCount, setOnlineCount] = useState(0);
-
-//   useEffect(() => {
-//     const supabase = createClient();
-//     const channel = supabase.channel(`room-presence:${room.id}`, {
-//       config: { presence: { key: user.id } },
-//     });
-
-//     const updateOnlineCount = () => {
-//       const state = channel.presenceState<{ user_id: string }>();
-//       const onlineUsers = new Set(
-//         Object.values(state).flatMap((presences) => presences.map((presence) => presence.user_id)),
-//       );
-//       setOnlineCount(onlineUsers.size);
-//     };
-
-//     channel
-//       .on("presence", { event: "sync" }, updateOnlineCount)
-//       .subscribe(async (status) => {
-//         if (status === "SUBSCRIBED") {
-//           await channel.track({ user_id: user.id });
-//           updateOnlineCount();
-//         }
-//       });
-
-//     return () => {
-//       void supabase.removeChannel(channel);
-//     };
-//   }, [room.id, user.id]);
-
-//   useEffect(() => {
-//     const supabase = createClient();
-//     const channel = supabase
-//       .channel(`room-messages:${room.id}`)
-//       .on(
-//         "postgres_changes",
-//         { event: "INSERT", schema: "public", table: "message", filter: `chat_room_id=eq.${room.id}` },
-//         (payload) => {
-//           const incoming = payload.new as {
-//             id: string;
-//             text: string;
-//             created_at: string;
-//             author_id: string;
-//           };
-
-//           setMessages((current) => {
-//             if (current.some((item) => item.id === incoming.id)) return current;
-//             return [...current, {
-//               ...incoming,
-//               author: {
-//                 name: incoming.author_id === user.id ? "You" : "User",
-//                 image_url: null,
-//               },
-//             }];
-//           });
-//         },
-//       )
-//       .subscribe();
-
-//     return () => {
-//       void supabase.removeChannel(channel);
-//     };
-//   }, [room.id, user.id]);
-
-//   return <div className="container mx-auto h-screen-with-header max-w-3xl border border-y-0 flex flex-col">
-//     <div className="border-b p-4">
-//       <div className="font-semibold">{room.name}</div>
-//       <div className="text-sm text-muted-foreground">
-//         {onlineCount} {onlineCount === 1 ? "user" : "users"} online
-//       </div>
-//     </div>
-//     <div className="grow overflow-y-auto space-y-3 p-4" style={{ scrollbarWidth: "thin", scrollbarColor: "var(--border) transparent" }}>
-//       {messages.length ? messages.map((item) => <ChatMessage key={item.id} {...item} />) : <p className="text-sm text-muted-foreground">No messages yet.</p>}
-//     </div>
-//     <ChatInput roomId={room.id} authorId={user.id} onSent={(newMessage) => setMessages((current) => [...current, newMessage])} />
-//   </div>;
-// }
-
-// function ChatMessage(message: Message) {
-//   return (
-//     <div className="flex gap-4 px-4 py-2 hover:bg-accent/50">
-//       <div className="shrink-0">
-//         {message.author.image_url ? (
-//           <img
-//             src={message.author.image_url}
-//             alt={message.author.name}
-//             width={32}
-//             height={32}
-//             className="h-8 w-8 rounded-full"
-//           />
-//         ) : (
-//           <div className="flex size-10 items-center justify-center overflow-hidden rounded-full border bg-muted text-muted-foreground">
-//             <UserIcon className="size-[30px] rounded-full text-muted-foreground" />
-//           </div>
-//         )}
-//       </div>
-//       <div className="min-w-0">
-//         <p className="font-medium">{message.author.name}</p>
-//         <p className="break-words">{message.text}</p>
-//         <p className="mt-1 text-xs text-muted-foreground">
-//           {new Date(message.created_at).toLocaleString()}
-//         </p>
-//       </div>
-//     </div>
-//   );
-// }
-
-
-
-
-
-
-
-
-
-
-
 "use client";
 
 import { useEffect, useState } from "react";
@@ -132,6 +5,9 @@ import { ChatInput } from "@/src/components/chat-input";
 import type { Message } from "@/src/services/supabase/actions/messages";
 import { createClient } from "@/src/services/supabase/client";
 import { UserIcon } from "lucide-react";
+import Image from "next/image"
+
+
 
 export function RoomClient({
   room,
@@ -286,8 +162,8 @@ function ChatMessage(message: Message) {
   return (
     <div className="flex gap-4 px-4 py-2 hover:bg-accent/50">
       <div className="shrink-0">
-        {message.author.image_url ? (
-          <img
+        {message.author.image_url != null ? (
+          <Image
             src={message.author.image_url}
             alt={message.author.name}
             width={32}
@@ -296,15 +172,15 @@ function ChatMessage(message: Message) {
           />
         ) : (
           <div className="flex size-10 items-center justify-center overflow-hidden rounded-full border bg-muted text-muted-foreground">
-            <UserIcon className="size-[30px] rounded-full text-muted-foreground" />
+            <UserIcon className="size-7.5 rounded-full mt-2.5 text-muted-foreground" />
           </div>
         )}
       </div>
 
       <div className="min-w-0">
-        <p className="font-medium">{message.author.name}</p>
+        <p className="font-medium text-gray-100">{message.author.name}</p>
 
-        <p className="break-words">{message.text}</p>
+        <p className="wrap-break-words whitespace-pre">{message.text}</p>
 
         <p className="mt-1 text-xs text-muted-foreground">
           {new Date(message.created_at).toLocaleString()}

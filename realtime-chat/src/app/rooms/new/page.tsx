@@ -14,11 +14,6 @@ import { toast } from "sonner";
 import z from "zod";
 
 
-const formSchema = z.object({
-  name: z.string().min(1).trim(),
-  isPublic: z.boolean()
-})
-
 type FormData = z.infer<typeof createRoomSchema>
 
 

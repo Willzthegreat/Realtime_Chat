@@ -54,6 +54,5 @@ export default async function RoomPage({ params }: RoomPageProps) {
     author_id: message.author_id,
     author: Array.isArray(message.author) ? message.author[0] : message.author,
   }));
-
   return <RoomClient room={{ id: room.id, name: room.name }} user={{ id: user.id }} message={initialMessages} />;
 }

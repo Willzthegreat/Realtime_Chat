@@ -15,7 +15,6 @@ import { getCurrentUser } from "../services/supabase/lib/getCurrentUser";
 import { redirect } from "next/navigation";
 import {
   Card,
-  CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
@@ -228,9 +227,9 @@ async function getRoomsForUser(userId: string) {
   return {
     joinedRooms: roomsWithCounts
       .filter((room) => !room.isPublic && room.isJoined)
-      .map(({ isPublic: _isPublic, ...room }) => room),
+      .map(({ id, name, memberCount, isJoined }) => ({ id, name, memberCount, isJoined })),
     publicRooms: roomsWithCounts
       .filter((room) => room.isPublic)
-      .map(({ isPublic: _isPublic, ...room }) => room),
+      .map(({ id, name, memberCount, isJoined }) => ({ id, name, memberCount, isJoined })),
   };
 }
