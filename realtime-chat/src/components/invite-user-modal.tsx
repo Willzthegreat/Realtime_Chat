@@ -170,7 +170,7 @@ export function InviteUserModal({ roomId }: InviteUserModalProps) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogTrigger
           render={
-            <Button variant="outline" type="button" className="shrink-0">
+            <Button variant="outline" type="button" className="shrink-0 cursor-pointer">
               <UserPlusIcon className="mr-2 h-4 w-4" />
               Invite User
             </Button>
