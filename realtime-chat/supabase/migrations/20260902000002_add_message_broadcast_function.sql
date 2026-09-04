@@ -1,4 +1,4 @@
-create or replace function public.broadcast_message_insert()
+create or replace function public.broadcast_new_message()
 returns trigger
 language plpgsql
 security definer
@@ -30,9 +30,9 @@ begin
 end;
 $$;
 
-revoke all on function public.broadcast_message_insert() from public;
+revoke all on function public.broadcast_new_message() from public;
 
 create or replace trigger on_message_insert_broadcast
 after insert on public.message
 for each row
-execute function public.broadcast_message_insert();
+execute function public.broadcast_new_message();

@@ -5,7 +5,7 @@ import { ChatInput } from "@/src/components/chat-input";
 import type { Message } from "@/src/services/supabase/actions/messages";
 import { createClient } from "@/src/services/supabase/client";
 import { UserIcon } from "lucide-react";
-import Image from "next/image"
+import Image from "next/image";
 
 
 
@@ -24,52 +24,18 @@ export function RoomClient({
   useEffect(() => {
     const supabase = createClient();
 
-    const channel = supabase.channel(`room-presence:${room.id}`, {
-      config: {
-        presence: {
-          key: user.id,
+    const channel = supabase
+      .channel(`room:${room.id}:messages`, {
+        config: {
+          private: true,
+          presence: {
+            key: user.id,
+          },
         },
-      },
-    });
-
-    const updateOnlineCount = () => {
-      const state = channel.presenceState<{
-        user_id: string;
-      }>();
-
-      const onlineUsers = new Set(
-        Object.values(state).flatMap((presences) =>
-          presences.map((presence) => presence.user_id),
-        ),
-      );
-
-      setOnlineCount(onlineUsers.size);
-    };
-
-    channel
+      })
       .on("presence", { event: "sync" }, updateOnlineCount)
       .on("presence", { event: "join" }, updateOnlineCount)
       .on("presence", { event: "leave" }, updateOnlineCount)
-      .subscribe(async (status) => {
-        if (status === "SUBSCRIBED") {
-          await channel.track({
-            user_id: user.id,
-          });
-
-          updateOnlineCount();
-        }
-      });
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [room.id, user.id]);
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    const channel = supabase
-      .channel(`room:${room.id}:messages`, { config: { private: true } })
       .on(
         "postgres_changes",
         {
@@ -137,7 +103,30 @@ export function RoomClient({
           ];
         });
       })
-      .subscribe();
+      .subscribe(async (status) => {
+        if (status === "SUBSCRIBED") {
+          await channel.track({ user_id: user.id });
+          updateOnlineCount();
+        } else {
+          console.error("Room realtime subscription failed:", status);
+        }
+      });
+
+    function updateOnlineCount() {
+      const state = channel.presenceState<{ user_id?: string }>();
+      const onlineUsers = new Set(
+        Object.values(state).flatMap((presences) =>
+          presences
+            .map((presence) => presence.user_id)
+            .filter((userId): userId is string => Boolean(userId)),
+        ),
+      );
+
+      // The current user is online as soon as this channel is subscribed,
+      // even if Presence has not emitted its first sync event yet.
+      onlineUsers.add(user.id);
+      setOnlineCount(onlineUsers.size);
+    }
 
     return () => {
       void supabase.removeChannel(channel);
@@ -155,7 +144,7 @@ export function RoomClient({
       </div>
 
       <div
-        className="grow overflow-y-auto space-y-3 p-4"
+        className="grow overflow-y-auto space-y-3 p-4 flex flex-col"
         style={{
           scrollbarWidth: "thin",
           scrollbarColor: "var(--border) transparent",
