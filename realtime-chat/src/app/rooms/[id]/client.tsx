@@ -6,6 +6,8 @@ import type { Message } from "@/src/services/supabase/actions/messages";
 import { createClient } from "@/src/services/supabase/client";
 import { UserIcon } from "lucide-react";
 import Image from "next/image";
+import { cn } from "@/src/lib/utils";
+import { InviteUserModal } from "@/src/components/invite-user-modal";
 
 
 
@@ -23,9 +25,11 @@ export function RoomClient({
 
   useEffect(() => {
     const supabase = createClient();
+    const topic = `room:${room.id}:messages`;
+    let disposed = false;
 
     const channel = supabase
-      .channel(`room:${room.id}:messages`, {
+      .channel(topic, {
         config: {
           private: true,
           presence: {
@@ -103,11 +107,28 @@ export function RoomClient({
           ];
         });
       })
-      .subscribe(async (status, error) => {
+      .subscribe((status, error) => {
+        // Removing a channel during effect cleanup intentionally produces a
+        // CLOSED status. Do not report that expected lifecycle event as an
+        // application error.
+        if (disposed) return;
+
         if (status === "SUBSCRIBED") {
-          await channel.track({ user_id: user.id });
-          updateOnlineCount();
-        } else {
+          void (async () => {
+            const { error: trackError } = await channel.track({
+              user_id: user.id,
+            });
+
+            if (disposed) return;
+
+            if (trackError) {
+              console.error("Room presence tracking failed:", trackError);
+              return;
+            }
+
+            updateOnlineCount();
+          })();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           console.error("Room realtime subscription failed:", status, error);
         }
       });
@@ -129,18 +150,24 @@ export function RoomClient({
     }
 
     return () => {
+      disposed = true;
+      setOnlineCount(0);
       void supabase.removeChannel(channel);
     };
   }, [room.id, user.id]);
 
   return (
     <div className="container mx-auto h-screen-with-header max-w-3xl border border-y-0 flex flex-col">
-      <div className="border-b p-4">
-        <div className="font-semibold">{room.name}</div>
+      <div className="border-b p-4 flex items-center justify-between gap-4">
+        <div>
+          <div className="font-semibold">{room.name}</div>
 
-        <div className="text-sm text-muted-foreground">
-          {onlineCount} {onlineCount === 1 ? "user" : "users"} online
+          <div className="text-sm text-muted-foreground">
+            {onlineCount} {onlineCount === 1 ? "user" : "users"} online
+          </div>
         </div>
+
+        <InviteUserModal roomId={room.id} />
       </div>
 
       <div
@@ -152,7 +179,7 @@ export function RoomClient({
       >
         {messages.length ? (
           messages.map((item) => (
-            <ChatMessage key={item.id} {...item} />
+            <ChatMessage key={item.id} message={item} />
           ))
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -178,9 +205,22 @@ export function RoomClient({
   );
 }
 
-function ChatMessage(message: Message) {
+function ChatMessage({
+  message,
+  status,
+}: {
+  message: Message;
+  status?: "pending" | "error" | "success";
+}) {
   return (
-    <div className="flex gap-4 px-4 py-2 hover:bg-accent/50">
+    <div
+      className={cn(
+        "flex gap-4 px-4 py-2 hover:bg-accent/50",
+        status === "pending" && "opacity-80",
+        status === "error" && "bg-red-500/80",
+        status === "success" && "bg-green-500/80",
+      )}
+    >
       <div className="shrink-0">
         {message.author.image_url != null ? (
           <Image
@@ -188,7 +228,7 @@ function ChatMessage(message: Message) {
             alt={message.author.name}
             width={32}
             height={32}
-            className="h-8 w-8 rounded-full"
+            className="h-8 w-8 rounded-full" 
           />
         ) : (
           <div className="flex size-10 items-center justify-center overflow-hidden rounded-full border bg-muted text-muted-foreground">
@@ -198,9 +238,22 @@ function ChatMessage(message: Message) {
       </div>
 
       <div className="min-w-0">
-        <p className="font-medium text-gray-100">{message.author.name}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium text-gray-100">{message.author.name}</p>
+          {status && (
+            <span
+              className="text-xs text-muted-foreground"
+              role="status"
+              aria-label={`Message ${status}`}
+            >
+              {status === "pending" && "Sending…"}
+              {status === "success" && "Sent"}
+              {status === "error" && "Failed"}
+            </span>
+          )}
+        </div>
 
-        <p className="wrap-break-words whitespace-pre">{message.text}</p>
+        <p className="wrap-break-words whitespace-pre-wrap">{message.text}</p>
 
         <p className="mt-1 text-xs text-muted-foreground">
           {new Date(message.created_at).toLocaleString()}
