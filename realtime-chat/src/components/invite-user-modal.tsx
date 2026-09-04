@@ -168,12 +168,14 @@ export function InviteUserModal({ roomId }: InviteUserModalProps) {
   return (
     <>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogTrigger asChild>
-          <Button variant="outline" className="w-full">
-            <UserPlusIcon className="mr-2 h-4 w-4" />
-            Invite User
-          </Button>
-        </DialogTrigger>
+        <DialogTrigger
+          render={
+            <Button variant="outline" type="button" className="shrink-0">
+              <UserPlusIcon className="mr-2 h-4 w-4" />
+              Invite User
+            </Button>
+          }
+        />
 
         <DialogContent className="sm:max-w-md">
           <DialogHeader>

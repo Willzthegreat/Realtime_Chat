@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { ChatInput } from "@/src/components/chat-input";
 import type { Message } from "@/src/services/supabase/actions/messages";
 import { createClient } from "@/src/services/supabase/client";
@@ -8,8 +8,6 @@ import { UserIcon } from "lucide-react";
 import Image from "next/image";
 import { cn } from "@/src/lib/utils";
 import { InviteUserModal } from "@/src/components/invite-user-modal";
-
-
 
 export function RoomClient({
   room,
@@ -20,8 +18,17 @@ export function RoomClient({
   room: { id: string; name: string };
   message: Message[];
 }) {
-  const [messages, setMessages] = useState<Message[]>(message);
   const [onlineCount, setOnlineCount] = useState(0);
+  const {
+    loadMoreMessages,
+    messages: oldMessages,
+    status,
+    triggerQueryRef,
+    addMessage,
+  } = useInfiniteScrollChat({
+    roomId: room.id,
+    startingMessages: message.toReversed(),
+  });
 
   useEffect(() => {
     const supabase = createClient();
@@ -40,42 +47,6 @@ export function RoomClient({
       .on("presence", { event: "sync" }, updateOnlineCount)
       .on("presence", { event: "join" }, updateOnlineCount)
       .on("presence", { event: "leave" }, updateOnlineCount)
-      .on(
-        "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "message",
-          filter: `chat_room_id=eq.${room.id}`,
-        },
-        (payload) => {
-          const incoming = payload.new as {
-            id: string;
-            text: string;
-            created_at: string;
-            author_id: string;
-          };
-
-          setMessages((current) => {
-            if (current.some((item) => item.id === incoming.id)) {
-              return current;
-            }
-
-            const newMessage = {
-              ...incoming,
-              author: {
-                name:
-                  incoming.author_id === user.id
-                    ? "You"
-                    : "User",
-                image_url: null,
-              },
-            } as Message;
-
-            return [...current, newMessage];
-          });
-        },
-      )
       .on("broadcast", { event: "INSERT" }, (payload) => {
         const record = payload.payload as {
           id: string;
@@ -87,42 +58,30 @@ export function RoomClient({
 
         if (!record) return;
 
-        setMessages((current) => {
-          if (current.some((item) => item.id === record.id)) {
-            return current;
-          }
-
-          return [
-            ...current,
-            {
-              id: record.id,
-              text: record.text,
-              created_at: record.created_at,
-              author_id: user.id,
-              author: {
-                name: record.author_name,
-                image_url: record.author_image_url,
-              },
-            },
-          ];
-        });
+        addMessage({
+          id: record.id,
+          text: record.text,
+          created_at: record.created_at,
+          author_id: user.id,
+          author: {
+            name: record.author_name,
+            image_url: record.author_image_url,
+          },
+        } as Message);
       })
       .subscribe((status, error) => {
-        // Removing a channel during effect cleanup intentionally produces a
-        // CLOSED status. Do not report that expected lifecycle event as an
-        // application error.
         if (disposed) return;
 
         if (status === "SUBSCRIBED") {
           void (async () => {
-            const { error: trackError } = await channel.track({
+            const trackStatus = await channel.track({
               user_id: user.id,
             });
 
             if (disposed) return;
 
-            if (trackError) {
-              console.error("Room presence tracking failed:", trackError);
+            if (trackStatus !== "ok") {
+              console.error("Room presence tracking failed:", trackStatus);
               return;
             }
 
@@ -135,6 +94,7 @@ export function RoomClient({
 
     function updateOnlineCount() {
       const state = channel.presenceState<{ user_id?: string }>();
+
       const onlineUsers = new Set(
         Object.values(state).flatMap((presences) =>
           presences
@@ -143,8 +103,6 @@ export function RoomClient({
         ),
       );
 
-      // The current user is online as soon as this channel is subscribed,
-      // even if Presence has not emitted its first sync event yet.
       onlineUsers.add(user.id);
       setOnlineCount(onlineUsers.size);
     }
@@ -154,7 +112,12 @@ export function RoomClient({
       setOnlineCount(0);
       void supabase.removeChannel(channel);
     };
-  }, [room.id, user.id]);
+  }, [addMessage, room.id, user.id]);
+
+  const displayedMessages = useMemo(
+    () => oldMessages.toReversed(),
+    [oldMessages],
+  );
 
   return (
     <div className="container mx-auto h-screen-with-header max-w-3xl border border-y-0 flex flex-col">
@@ -177,9 +140,11 @@ export function RoomClient({
           scrollbarColor: "var(--border) transparent",
         }}
       >
-        {messages.length ? (
-          messages.map((item) => (
-            <ChatMessage key={item.id} message={item} />
+        {displayedMessages.length ? (
+          displayedMessages.map((item, index) => (
+            <div key={item.id} ref={index === 0 ? triggerQueryRef : undefined}>
+              <ChatMessage message={item} />
+            </div>
           ))
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -191,21 +156,29 @@ export function RoomClient({
       <ChatInput
         roomId={room.id}
         authorId={user.id}
-        onSent={(newMessage) =>
-          setMessages((current) => {
-            if (current.some((item) => item.id === newMessage.id)) {
-              return current;
-            }
-
-            return [...current, newMessage];
-          })
-        }
+        onSent={addMessage}
       />
+
+      {status === "loading" && (
+        <p className="px-4 pb-2 text-center text-xs text-muted-foreground">
+          Loading more message ....
+        </p>
+      )}
+
+      {status === "error" && (
+        <button
+          type="button"
+          className="pb-2 text-center text-xs text-destructive"
+          onClick={() => void loadMoreMessages()}
+        >
+          Error loading messages.
+        </button>
+      )}
     </div>
   );
 }
 
-function ChatMessage({
+const ChatMessage = memo(function ChatMessage({
   message,
   status,
 }: {
@@ -226,9 +199,10 @@ function ChatMessage({
           <Image
             src={message.author.image_url}
             alt={message.author.name}
-            width={32}
-            height={32}
-            className="h-8 w-8 rounded-full" 
+            width={40}
+            height={40}
+            sizes="40px"
+            className="h-10 w-10 rounded-full"
           />
         ) : (
           <div className="flex size-10 items-center justify-center overflow-hidden rounded-full border bg-muted text-muted-foreground">
@@ -239,7 +213,10 @@ function ChatMessage({
 
       <div className="min-w-0">
         <div className="flex items-center gap-2">
-          <p className="font-medium text-gray-100">{message.author.name}</p>
+          <p className="font-medium text-gray-100">
+            {message.author.name}
+          </p>
+
           {status && (
             <span
               className="text-xs text-muted-foreground"
@@ -253,7 +230,9 @@ function ChatMessage({
           )}
         </div>
 
-        <p className="wrap-break-words whitespace-pre-wrap">{message.text}</p>
+        <p className="wrap-break-words whitespace-pre-wrap">
+          {message.text}
+        </p>
 
         <p className="mt-1 text-xs text-muted-foreground">
           {new Date(message.created_at).toLocaleString()}
@@ -261,4 +240,98 @@ function ChatMessage({
       </div>
     </div>
   );
+});
+
+const LIMIT = 25;
+
+function useInfiniteScrollChat({
+  startingMessages,
+  roomId,
+  // authorId
+}: {
+  startingMessages: Message[];
+  roomId: string;
+  // authorId: string;
+}) {
+  const [messages, setMessages] = useState<Message[]>(startingMessages);
+
+  const [status, setStatus] = useState<
+    "idle" | "loading" | "error" | "done"
+  >("idle");
+
+  async function loadMoreMessages() {
+    if (status === "loading" || status === "done") return;
+
+    const supabase = createClient();
+
+    setStatus("loading");
+
+    const { data: newMessages, error } = await supabase
+      .from("message")
+      .select(
+        "id, text, created_at, author_id, author:user_profile(name, image_url)"
+      )
+      .eq("chat_room_id", roomId)
+      .order("created_at", { ascending: false })
+      .limit(LIMIT)
+      .lt(
+        "created_at",
+        messages.at(-1)?.created_at ?? new Date().toISOString()
+      );
+
+    if (error) {
+      setStatus("error");
+      return;
+    }
+
+    const messagesToAdd = (newMessages ?? []) as Message[];
+
+    setMessages((prev) => [...prev, ...messagesToAdd.toReversed()]);
+
+    setStatus(
+      messagesToAdd.length < LIMIT ? "done" : "idle"
+    );
+  }
+
+  function triggerQueryRef(node: HTMLDivElement | null) {
+    if (node == null) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+
+        if (entry.isIntersecting && entry.target === node) {
+          observer.unobserve(node);
+          void loadMoreMessages();
+        }
+      },
+      {
+        rootMargin: "50px",
+      }
+    );
+
+    observer.observe(node);
+
+    return () => {
+      observer.disconnect();
+    };
+  }
+
+  const addMessage = useCallback((newMessage: Message) => {
+    setMessages((current) => {
+      if (current.some((item) => item.id === newMessage.id)) {
+        return current;
+      }
+
+      return [newMessage, ...current];
+    });
+  }, []);
+
+  return {
+    messages,
+    status,
+    loadMoreMessages,
+    triggerQueryRef,
+    addMessage,
+  };
 }

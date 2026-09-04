@@ -36,7 +36,7 @@ export default async function RoomPage({ params }: RoomPageProps) {
         .select("id, text, created_at, author_id, author:user_profile(name, image_url)")
         .eq("chat_room_id", id)
         .order("created_at", { ascending: true })
-        .limit(120)
+        .limit(50)
     ]);
 
   if (roomError || room == null) {
