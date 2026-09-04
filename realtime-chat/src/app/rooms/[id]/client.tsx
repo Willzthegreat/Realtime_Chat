@@ -103,12 +103,12 @@ export function RoomClient({
           ];
         });
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status, error) => {
         if (status === "SUBSCRIBED") {
           await channel.track({ user_id: user.id });
           updateOnlineCount();
         } else {
-          console.error("Room realtime subscription failed:", status);
+          console.error("Room realtime subscription failed:", status, error);
         }
       });
 
